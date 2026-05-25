@@ -1,0 +1,8 @@
+"0","#| label: t1-02-na-check"
+"0",""
+"0","stations_with_na <- weather_wide |>"
+"0","filter(if_any(-c(Meteorological.Weather.Station, Month), is.na)) |>"
+"0","distinct(Meteorological.Weather.Station)"
+"2","错误于distinct(filter(weather_wide, if_any(-c(Meteorological.Weather.Station, : 
+  没有""distinct""这个函数
+"

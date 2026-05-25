@@ -1,0 +1,7 @@
+"0",""
+"0","weather_main <- weather_wide |>"
+"0","filter(!Meteorological.Weather.Station %in% stations_separate)"
+"0","weather_separated <- weather_wide |>"
+"0","filter(Meteorological.Weather.Station %in% stations_separate)"
+"0",""
+"0","weather_main"

@@ -1,0 +1,5 @@
+"0",""
+"0","plot(weather_main$sunshine_hours, weather_main$precipitation_mm,"
+"0","     xlab = ""Sunshine Hours"","
+"0","     ylab = ""Precipitation (mm)"","
+"0","     main = ""Sunshine vs Precipitation"")"

@@ -1,0 +1,55 @@
+# -----------------------------
+# Power Curve for Z-test
+# -----------------------------
+alpha <- 0.05
+n <- 20       # sample size
+sigma <- 1    # known standard deviation
+
+# Critical value for two-sided Z-test
+z_crit <- qnorm(1 - alpha/2)
+
+# Define power function
+power_func <- function(mu) {
+  # Z under true mu has mean mu * sqrt(n)/sigma
+  z_mean <- mu * sqrt(n) / sigma
+  
+  # Power = P(|Z| > z_crit) under N(z_mean, 1)
+  p_upper <- 1 - pnorm(z_crit, mean = z_mean, sd = 1)
+  p_lower <- pnorm(-z_crit, mean = z_mean, sd = 1)
+  
+  return(p_upper + p_lower)
+}
+
+# Generate grid of true mu values
+mu_grid <- seq(-3, 3, length.out = 200)
+
+# Compute power for each mu
+power_values <- sapply(mu_grid, power_func)
+
+# -----------------------------
+# Plot Power Curve
+# -----------------------------
+plot(mu_grid, power_values, type="l", lwd=2, col="blue",
+     xlab="True Mean μ",
+     ylab="Power = P(reject H0 | μ)",
+     main="Power Curve for Two-Sided Z-test")
+
+# Add α line at μ = 0 (null hypothesis)
+abline(h = alpha, col="red", lty=2)
+
+# Mark μ = 0
+abline(v = 0, col="darkgreen", lty=3)
+
+# Annotate key ideas
+text(0, alpha + 0.06, labels="Power = α when μ = 0 (H0 true)",
+     col="red", cex=0.9)
+
+text(2, 0.9, labels="Power increases\nas μ moves away from H0", 
+     col="blue", cex=0.9)
+
+text(-2, 0.9, labels="High power for large effect sizes", 
+     col="blue", cex=0.9)
+
+text(0.5, 0.15, labels="Low power near H0\n(small effects hard to detect)",
+     col="darkgreen", cex=0.85)
+

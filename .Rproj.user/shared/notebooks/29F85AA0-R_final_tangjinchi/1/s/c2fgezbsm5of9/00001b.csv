@@ -1,0 +1,6 @@
+"0","par(mfrow = c(1, 3))"
+"0",""
+"0","plot(weather_main$mean_wind_speed, weather_main$sunshine_hours,"
+"0","     xlab = ""Mean Wind Speed"","
+"0","     ylab = ""Sunshine Hours"","
+"0","     main = ""Wind vs Sunshine"")"

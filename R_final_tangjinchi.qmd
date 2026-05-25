@@ -1,0 +1,370 @@
+---
+title: "R final assignment"
+format: pdf
+author: Tang Jinchi 25204395
+---
+# Part 1 Analysis
+
+This section analyses Ireland’s climate over the past 60 years using four datasets (wind.csv, sunshine.csv, temperature.csv, and meteorological.csv), which represent four distinct domains of climatic data. The purpose of this analysis is to identify general climatic patterns and relationships among key variables.
+
+## 1.1 preprocess the dataset
+
+First we need to import relevant packages and datasets.
+
+### 1 Import pacakges
+```{r}
+#| label: load-packages
+#| message: false
+#| warning: false
+library(dplyr)
+library(tibble)
+library(lubridate)
+library(purrr)
+Sys.setlocale("LC_TIME", "C")
+```
+
+### 2 Import dataset
+
+```{r}
+wind <- read.csv("wind.csv", header = TRUE, stringsAsFactors = FALSE)
+sunshine <- read.csv("sunshine.csv", header = TRUE, stringsAsFactors = FALSE)
+temperature <- read.csv("temperature.csv", header = TRUE, stringsAsFactors = FALSE)
+meteorological <- read.csv("meteorological.csv", header = TRUE, stringsAsFactors = FALSE)
+
+
+wind <- tibble::as_tibble(wind)
+sunshine <- tibble::as_tibble(sunshine)
+temperature <- tibble::as_tibble(temperature)
+meteorological <- tibble::as_tibble(meteorological)
+
+
+
+datasets <- list(
+  wind = wind,
+  sunshine = sunshine,
+  temperature = temperature,
+  meteorological = meteorological
+)
+
+map(datasets, dim)
+```
+The purrr::map() function is used to apply the same operation across multiple datasets, allowing a concise and consistent comparison of their dimensions.The result shows that the observations among the 4 datasets are different from one another.So the next step is to explore the structure of the four datasets.  
+The temperature dataset has the largest number of observations, containing about six times more records than the wind and meteorological datasets. Therefore, the next section explores the relationships among the datasets and examines possible approaches for merging the data frames.
+
+### 3 Explore the relationship among data frames 
+
+First we can try to find whether all of the four datasets have the same stations.
+
+```{r}
+#| label: t1-10-station-count
+station_counts <- list(
+wind = length(unique(wind$`Meteorological.Weather.Station`)),
+sunshine = length(unique(sunshine$`Meteorological.Weather.Station`)),
+temperature = length(unique(temperature$`Meteorological.Weather.Station`)),
+meteorological = length(unique(meteorological$`Meteorological.Weather.Station`))
+)
+
+station_counts
+```
+
+
+
+The four datasets contain the same number of meteorological stations. Therefore, the next step is to examine differences in the labels across datasets.
+
+```{r}
+#| label: t1-21-all-statistic-labels
+
+
+all_statistics <- data.frame(
+dataset = c(
+rep("temperature", length(unique(temperature$Statistic.Label))),
+rep("wind", length(unique(wind$Statistic.Label))),
+rep("sunshine", length(unique(sunshine$Statistic.Label))),
+rep("meteorological", length(unique(meteorological$Statistic.Label)))
+),
+statistic_label = c(
+sort(unique(temperature$Statistic.Label)),
+sort(unique(wind$Statistic.Label)),
+sort(unique(sunshine$Statistic.Label)),
+sort(unique(meteorological$Statistic.Label))
+)
+)
+
+all_statistics
+```
+
+The temperature dataset records six different statistical measures per station and month, whereas the wind dataset records only two. Sunshine and meteorological variables contain a single measure. This difference in measurement granularity explains the large disparity in the number of observations across datasets.In order to obtain the final dataset we need,we should first divide the temperature and wind dataset and then combine them together.
+
+### 4 Divide data frames 
+
+The filter() function is applied to split data frames by statistical label. As the sunshine and precipitation datasets each contain only a single label, they are not further divided but are instead renamed for clarity.
+
+```{r}
+#| label: t1-24-split-temperature
+
+temp_mean_air <- temperature |>
+filter(Statistic.Label == "Mean Air Temperature")
+
+temp_mean_max <- temperature |>
+filter(Statistic.Label == "Mean Maximum Temperature")
+
+temp_mean_min <- temperature |>
+filter(Statistic.Label == "Mean Minimum Temperature")
+
+temp_max_air <- temperature |>
+filter(Statistic.Label == "Maximum Air Temperature")
+
+temp_min_air <- temperature |>
+filter(Statistic.Label == "Minimum Air Temperature")
+
+temp_grass_min <- temperature |>
+filter(Statistic.Label == "Grass Minimum Temperature")
+
+wind_mean <- wind |>
+filter(Statistic.Label == "Mean Wind Speed")
+
+wind_gust <- wind |>
+filter(Statistic.Label == "Highest Gust")
+
+sunshine_duration <- sunshine
+precipitation <- meteorological
+
+```
+
+
+### 5 Rename the columns
+
+Since all of the statistic values share the same name "VALUE", they need to be renamed for clarity after merging.
+
+```{r}
+#| label: t1-29-prepare-for-merge-all-temp
+
+# --- Temperature (all 6 labels) ---
+
+temp_mean_air <- temp_mean_air |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(mean_air_temperature = VALUE)
+
+temp_mean_max <- temp_mean_max |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(mean_max_temperature = VALUE)
+
+temp_mean_min <- temp_mean_min |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(mean_min_temperature = VALUE)
+
+temp_max_air <- temp_max_air |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(max_air_temperature = VALUE)
+
+temp_min_air <- temp_min_air |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(min_air_temperature = VALUE)
+
+temp_grass_min <- temp_grass_min |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(grass_min_temperature = VALUE)
+
+# --- Wind ---
+
+wind_mean <- wind_mean |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(mean_wind_speed = VALUE)
+
+wind_gust <- wind_gust |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(highest_gust = VALUE)
+
+# --- Sunshine & Precipitation ---
+
+sunshine_duration <- sunshine_duration |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(sunshine_hours = VALUE)
+
+precipitation <- precipitation |>
+select(Meteorological.Weather.Station, Month, VALUE) |>
+rename(precipitation_mm = VALUE)
+
+
+
+```
+
+
+### 6 Merge the dataframes
+
+Because all of the data frames share the same values in the two columns “Meteorological.Weather.Station” and “Month”, these two columns can be used as the keys for a left join.
+
+```{r}
+#| label: t1-30-horizontal-merge-all-temp
+
+weather_wide <- temp_mean_air |>
+left_join(temp_mean_max, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(temp_mean_min, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(temp_max_air, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(temp_min_air, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(temp_grass_min, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(wind_mean, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(wind_gust, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(sunshine_duration, by = c("Meteorological.Weather.Station", "Month")) |>
+left_join(precipitation, by = c("Meteorological.Weather.Station", "Month"))
+
+```
+
+Finally, we can check the resulting data frame by examining its dimensions and column names.
+
+```{r}
+head(weather_wide)
+dim(weather_wide)
+```
+### 7 Change the format of date
+```{r}
+
+weather_wide$month_date <- as.Date(
+paste0("01 ", weather_wide$Month),
+format = "%d %Y %B"
+)
+
+weather_wide$Year <- as.integer(format(weather_wide$month_date, "%Y"))
+weather_wide$Month <- as.integer(format(weather_wide$month_date, "%m"))
+
+
+weather_wide <- weather_wide |>
+select(-month_date,)
+
+head(weather_wide)
+```
+
+### 8 Check N/A Value
+
+The next section focuses on identifying missing (N/A) values and determining an appropriate approach for handling them.By viewing the data, we can find that stations like Cork airport and Casement have a lot of N/A values in the early years in 1960s.We can hence infer that during some early years, there are several stations were not built.So We need to group the data by station and year in order to find these stations. 
+
+```{r}
+
+#gather the data by the year and stations
+
+na_by_station_year <- weather_wide |>
+group_by(Meteorological.Weather.Station, Year) |>
+summarise(
+na_count = sum(is.na(across(where(is.numeric)))),
+.groups = "drop"
+)
+
+
+na_year_range <- na_by_station_year |>
+filter(na_count == 120) |>
+group_by(Meteorological.Weather.Station) |>
+summarise(
+first_na_year = min(Year),
+last_na_year = max(Year),
+.groups = "drop"
+)
+
+na_year_range
+```
+The results shows that the station of Phoenix Park, Markree, Roches Point Were built around 2005.So the three stations will be excluded in order to avoid massive N/A numbers.
+
+```{r}
+stations_separate <- c(
+"Markree",
+"Phoenix Park",
+"Roches Point"
+)
+
+weather_main <- weather_wide |>
+filter(!Meteorological.Weather.Station %in% stations_separate)
+
+#remaining 3 stations
+weather_separated <- weather_wide |>
+filter(Meteorological.Weather.Station %in% stations_separate)
+
+head(weather_main)
+
+```
+The variable of weather_main is the final data frame we are going to analyze.
+
+##  1.2 analyze the data
+
+### 1 Table of monthly temperature
+
+With the preprocessed dataset weather_main, we can further analyze the weather data.
+The first part focuses on the temperature data.
+```{r}
+mean_temp_by_month <- weather_main |>
+group_by(Month) |>
+summarise(
+mean_air_temperature = mean(mean_air_temperature, na.rm = TRUE),
+.groups = "drop"
+) |>
+arrange(Month)
+
+knitr::kable(
+mean_temp_by_month,
+col.names = c("Month", "Mean Air Temperature (°C)"),
+digits = 2
+)
+```
+
+The above table shows the monthly mean air temperature in Ireland, illustrating the overall a seasonal climate pattern in Ireland.Generally speaking, Ireland has a temperate martime climate featured by cool winter and mild summer.More detailed result can be shown by a line plot.
+
+### 2 Line plot of monthly temperature
+
+```{r}
+#line plot
+
+library(ggplot2)
+
+
+temp_jan_jul <- weather_main |>
+filter(Month %in% c(1, 7)) |>
+group_by(Year, Month) |>
+summarise(
+mean_air_temperature = mean(mean_air_temperature, na.rm = TRUE),
+.groups = "drop"
+)
+
+
+temp_jan_jul$Month <- factor(
+temp_jan_jul$Month,
+levels = c(1, 7),
+labels = c("January", "July")
+)
+
+
+ggplot(temp_jan_jul, aes(x = Year, y = mean_air_temperature, color = Month)) +
+geom_line() +
+geom_point() +
+labs(
+x = "Year",
+y = "Mean Air Temperature (°C)",
+color = "Month"
+) +
+theme_minimal()
+
+```
+The above figure shows a slow but steady increasing trend in Ireland’s temperature in both winter and summer. Over the past 60 years, the mean temperature in Ireland has increased by approximately 0.5 to 1 degree in both winter and summer. In addition, the temperature exhibits a periodic pattern with a cycle of approximately 4 to 5 years. During this period, years with lower temperatures are approximately 2.5 degrees cooler than years with higher temperatures.
+
+### Scatter plots of wind speed, sunshine hour and precipitation
+
+Besides temperature, meteorological variables such as sunshine duration, wind, and precipitation are visualized using multiple plots.
+```{r}
+par(mfrow = c(1, 3))
+
+plot(weather_main$mean_wind_speed, weather_main$sunshine_hours,
+     xlab = "Mean Wind Speed",
+     ylab = "Sunshine Hours",
+     main = "Wind vs Sunshine")
+
+plot(weather_main$mean_wind_speed, weather_main$precipitation_mm,
+     xlab = "Mean Wind Speed",
+     ylab = "Precipitation (mm)",
+     main = "Wind vs Precipitation")
+
+plot(weather_main$sunshine_hours, weather_main$precipitation_mm,
+     xlab = "Sunshine Hours",
+     ylab = "Precipitation (mm)",
+     main = "Sunshine vs Precipitation")
+
+
+
+```
+The three scatter plots indicate clear relationships among wind speed, sunshine hours, and precipitation. As wind speed and precipitation increase, sunshine hours tend to decrease, suggesting a negative relationship between sunshine duration and both wind speed and precipitation. In contrast, wind speed and precipitation exhibit a positive correlation.

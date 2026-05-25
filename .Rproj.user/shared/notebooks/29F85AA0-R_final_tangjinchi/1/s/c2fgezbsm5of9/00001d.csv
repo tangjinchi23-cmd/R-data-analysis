@@ -1,0 +1,5 @@
+"0",""
+"0","plot(weather_main$mean_wind_speed, weather_main$precipitation_mm,"
+"0","     xlab = ""Mean Wind Speed"","
+"0","     ylab = ""Precipitation (mm)"","
+"0","     main = ""Wind vs Precipitation"")"
